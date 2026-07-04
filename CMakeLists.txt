@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.22)
 project(naleystogramm-core LANGUAGES CXX)
 
+# C нужен для вендоренного sqlite3.c (third_party/sqlite3/) — фолбэк, когда
+# нет системного sqlite3/SQLCipher (Android NDK и т.п.)
+enable_language(C)
+
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -24,7 +28,13 @@ endif()
 find_package(OpenSSL REQUIRED)
 find_package(PkgConfig QUIET)
 
-if(PkgConfig_FOUND AND NOT WIN32)
+# pkg-config шеллится в ХОСТОВЫЙ pkg-config и не уважает CMAKE_FIND_ROOT_PATH/
+# sysroot при кросс-компиляции — под Android NDK он находит host-пакеты
+# (например Arch-сборку sqlcipher), которые физически не совместимы с
+# ABI цели. Поэтому здесь эти detection'ы пропускаются полностью при
+# кросс-компиляции (ANDROID выставляется NDK-тулчейном); Android получает
+# core без SQLCipher/ALSA, пока под них не появятся отдельные Android-сборки.
+if(PkgConfig_FOUND AND NOT WIN32 AND NOT ANDROID AND NOT CMAKE_CROSSCOMPILING)
     pkg_check_modules(SQLCIPHER QUIET sqlcipher)
     pkg_check_modules(ALSA     QUIET alsa)
 endif()
@@ -181,12 +191,29 @@ add_custom_target(core-purity
 
 # ── sqlite3 (Storage) — только если не найден SQLCipher (взаимоисключающие) ──
 if(NOT SQLCIPHER_FOUND)
-    pkg_check_modules(SQLITE3 QUIET sqlite3)
+    if(NOT ANDROID AND NOT CMAKE_CROSSCOMPILING)
+        pkg_check_modules(SQLITE3 QUIET sqlite3)
+    endif()
     if(SQLITE3_FOUND)
         target_link_libraries(naleystogramm-core PUBLIC ${SQLITE3_LINK_LIBRARIES})
         target_include_directories(naleystogramm-core PUBLIC ${SQLITE3_INCLUDE_DIRS})
     else()
-        target_link_libraries(naleystogramm-core PUBLIC sqlite3)
+        # Нет системного sqlite3 (Android NDK sysroot его не поставляет, либо
+        # host без sqlite3-dev) — компилируем вендоренный amalgamation
+        # (third_party/sqlite3/, sqlite3.org, версия синхронизирована с
+        # системной на момент выноса — 3.53.3).
+        message(STATUS "sqlite3:         системный не найден — используется вендоренный amalgamation")
+        add_library(sqlite3-vendored STATIC third_party/sqlite3/sqlite3.c)
+        target_include_directories(sqlite3-vendored PUBLIC third_party/sqlite3)
+        target_compile_definitions(sqlite3-vendored PRIVATE
+            SQLITE_THREADSAFE=1
+            SQLITE_OMIT_LOAD_EXTENSION=1
+        )
+        if(NOT WIN32)
+            find_package(Threads REQUIRED)
+            target_link_libraries(sqlite3-vendored PUBLIC Threads::Threads ${CMAKE_DL_LIBS})
+        endif()
+        target_link_libraries(naleystogramm-core PUBLIC sqlite3-vendored)
     endif()
 else()
     message(STATUS "SQLCipher:       найден (${SQLCIPHER_VERSION}) — шифрование БД включено")
