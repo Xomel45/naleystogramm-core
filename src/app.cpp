@@ -42,16 +42,16 @@ App::App() {
     if (!KeyProtector::instance().init(dataDir))
         fprintf(stderr, "[App] KeyProtector не инициализирован — данные будут незащищены\n");
 
-    m_storage = new StorageManager();
+    m_storage = std::make_unique<StorageManager>();
     m_storage->open();
 
     m_e2e = std::make_unique<E2EManager>();
     m_e2e->init(id.uuid(), dataDir);
 
-    m_network      = new NetworkManager();
-    m_fileTransfer = std::make_unique<FileTransfer>(m_network, m_e2e.get(), dataDir);
-    m_callManager  = std::make_unique<CallManager>(m_network, m_e2e.get());
-    m_shellManager = std::make_unique<RemoteShellManager>(m_network, m_e2e.get());
+    m_network      = std::make_unique<NetworkManager>();
+    m_fileTransfer = std::make_unique<FileTransfer>(m_network.get(), m_e2e.get(), dataDir);
+    m_callManager  = std::make_unique<CallManager>(m_network.get(), m_e2e.get());
+    m_shellManager = std::make_unique<RemoteShellManager>(m_network.get(), m_e2e.get());
 }
 
 App::~App() {

@@ -25,9 +25,11 @@ public:
     [[nodiscard]] RemoteShellManager& shellManager();
 
 private:
-    StorageManager*                m_storage     {nullptr};
-    std::unique_ptr<E2EManager>    m_e2e;
-    NetworkManager*                m_network     {nullptr};
+    // Порядок объявления = порядок инициализации; разрушение обратное —
+    // fileTransfer/callManager/shellManager умирают раньше network и storage
+    std::unique_ptr<StorageManager> m_storage;
+    std::unique_ptr<E2EManager>     m_e2e;
+    std::unique_ptr<NetworkManager> m_network;
     std::unique_ptr<FileTransfer>  m_fileTransfer;
     std::unique_ptr<CallManager>   m_callManager;
     std::unique_ptr<RemoteShellManager> m_shellManager;
