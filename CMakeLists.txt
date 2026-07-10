@@ -75,7 +75,7 @@ endif()
 # ── naleystogramm-crypto (E2E: X3DH + Double Ratchet) ────────────────────────
 FetchContent_Declare(naleystogramm-crypto
     GIT_REPOSITORY https://github.com/Xomel45/naleystogramm-crypto.git
-    GIT_TAG        c5a364ebe5aa28faf9e089a20d707774caea124f
+    GIT_TAG        8d182fe42a55d63aab9d374eb7a59fdc1baedfd3
     GIT_SHALLOW    FALSE
 )
 FetchContent_MakeAvailable(naleystogramm-crypto)
